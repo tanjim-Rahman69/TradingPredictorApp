@@ -11,9 +11,7 @@ import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.WindowManager;
 import android.view.Surface;
-import android.hardware.display.VirtualDisplay;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -27,13 +25,14 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_SCREENSHOT = 1001;
     private MediaProjectionManager projectionManager;
     private MediaProjection mediaProjection;
-    private VirtualDisplay virtualDisplay;
     private ImageReader imageReader;
 
     private int width, height, density;
 
     private Button startButton;
     private TextView predictionText;
+
+    private ModelPredictor modelPredictor;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
         predictionText = findViewById(R.id.predictionText);
 
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        modelPredictor = new ModelPredictor(this);
 
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
@@ -67,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
             imageReader = ImageReader.newInstance(width, height, ImageFormat.RGB_565, 2);
             Surface surface = imageReader.getSurface();
 
-            virtualDisplay = mediaProjection.createVirtualDisplay("ScreenCapture",
+            mediaProjection.createVirtualDisplay("ScreenCapture",
                     width, height, density,
                     0, surface, null, null);
 
@@ -85,7 +85,11 @@ public class MainActivity extends AppCompatActivity {
                                 height, Bitmap.Config.RGB_565);
                         bitmap.copyPixelsFromBuffer(buffer);
 
-                        runOnUiThread(() -> predictionText.setText("Captured a frame!"));
+                        float[] ohlc = ChartProcessor.extractOHLCFromBitmap(bitmap);
+                        float[] prediction = modelPredictor.predictNextCandle(ohlc);
+
+                        runOnUiThread(() -> predictionText.setText("Next Candle: " + prediction[0]));
+
                         image.close();
                     }
                 } catch (Exception e) {
